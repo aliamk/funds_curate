@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import tempfile
 from datetime import datetime
+from openpyxl import load_workbook
 
 def copy_columns(source_df, mapping, additional_values=None):
     dest_df = pd.DataFrame()
@@ -67,6 +68,23 @@ def append_performance_data(writer, source_df, startrow):
         startrow += len(performance_df)
     
     return startrow
+
+def autofit_columns(writer_path):
+    workbook = load_workbook(writer_path)
+    for sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+        for col in sheet.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            sheet.column_dimensions[column].width = adjusted_width
+    workbook.save(writer_path)
 
 def process_file(uploaded_file):
     xls = pd.ExcelFile(uploaded_file)
@@ -216,15 +234,17 @@ def process_file(uploaded_file):
                 target_sectors_primary_df = copy_columns(source_df, target_sectors_primary_mapping)
                 target_sectors_primary_df.to_excel(writer, sheet_name='Target_Sectors_Primary', index=False)
 
+        # Auto-fit column widths
+        autofit_columns(tmp.name)
+
         # Generate file name with current date and time
         now = datetime.now().strftime("%Y%m%d_%H%M")
-        tmp_path = tmp.name
         dest_file_name = f"funds_curated_{now}.xlsx"
-        dest_file_path = tmp_path
+        dest_file_path = tmp.name
 
     return dest_file_path, dest_file_name
 
-st.title("Curating FUNDS data files")
+st.title("Excel Column Copier")
 st.write("Upload your source Excel file to create a destination file based on predefined instructions.")
 
 uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
