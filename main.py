@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import tempfile
+from datetime import datetime
 
 def copy_columns(source_df, mapping, additional_values=None):
     dest_df = pd.DataFrame()
@@ -215,21 +216,25 @@ def process_file(uploaded_file):
                 target_sectors_primary_df = copy_columns(source_df, target_sectors_primary_mapping)
                 target_sectors_primary_df.to_excel(writer, sheet_name='Target_Sectors_Primary', index=False)
 
+        # Generate file name with current date and time
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
         tmp_path = tmp.name
+        dest_file_name = f"funds_curated_{now}.xlsx"
+        dest_file_path = tmp_path
 
-    return tmp_path
+    return dest_file_path, dest_file_name
 
-st.title("Excel Column Copier")
+st.title("Curating FUNDS data files")
 st.write("Upload your source Excel file to create a destination file based on predefined instructions.")
 
 uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 
 if uploaded_file:
-    dest_file_path = process_file(uploaded_file)
-    st.success(f"Destination file created successfully!")
+    dest_file_path, dest_file_name = process_file(uploaded_file)
+    st.success(f"Destination file '{dest_file_name}' created successfully!")
     st.download_button(
         label="Download Destination File",
         data=open(dest_file_path, "rb"),
-        file_name="destination.xlsx",
+        file_name=dest_file_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
