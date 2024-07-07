@@ -13,9 +13,13 @@ def copy_columns(source_df, mapping, additional_values=None):
             dest_df[dest_col] = additional_values.get(dest_col, "") if additional_values else ""
     return dest_df
 
-def append_close_data(writer, source_df, status, event_type, title_suffix, startrow):
+def append_close_data(writer, source_df, status, event_type, title_suffix, startrow, report):
     close_filter = source_df["STATUS"] == status
     close_funds = source_df[close_filter]
+    if close_funds.empty:
+        report.append(f"{status} data => data was not found in the source file")
+        return startrow
+
     close_df = pd.DataFrame({
         "Fund": close_funds["NAME"],
         "Event Date": close_funds["LATEST INTERIM CLOSE DATE"],
@@ -26,11 +30,12 @@ def append_close_data(writer, source_df, status, event_type, title_suffix, start
 
     if not close_df.empty:
         close_df.to_excel(writer, sheet_name='Events', index=False, header=False, startrow=startrow)
+        report.append(f"{status} data => from row {startrow + 2}")
         startrow += len(close_df)
 
     return startrow
 
-def append_performance_data(writer, source_df, startrow):
+def append_performance_data(writer, source_df, startrow, report):
     performance_mapping = {
         "NAME": "Fund",
         "": "Performance Date",
@@ -65,6 +70,7 @@ def append_performance_data(writer, source_df, startrow):
 
     if not performance_df.empty:
         performance_df.to_excel(writer, sheet_name='Performances', index=False, header=False, startrow=startrow)
+        report.append(f"Target IRR (Gross) (%) data => from row {startrow + 1}")
         startrow += len(performance_df)
     
     return startrow
@@ -89,6 +95,8 @@ def autofit_columns(writer_path):
 def process_file(uploaded_file):
     xls = pd.ExcelFile(uploaded_file)
     sheets = xls.sheet_names
+    report = []
+
     funds_mapping = {
         "NAME": "Fund",  
         "FUND CURRENCY": "Fund Currency",  
@@ -155,24 +163,28 @@ def process_file(uploaded_file):
         with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
             for sheet in sheets:
                 source_df = pd.read_excel(xls, sheet_name=sheet)
+                
+                # Funds tab
                 funds_df = copy_columns(source_df, funds_mapping)
                 funds_df.to_excel(writer, sheet_name='Funds', index=False)
+                report.append("Funds tab created")
+                report.append(f"{len(funds_df.columns)} Columns")
+                report.extend(funds_df.columns)
+                report.append("///////////////////////////////////////////////////////////////////////////")
 
+                # Events tab
                 events_df = copy_columns(source_df, events_mapping)
-                
-                # Initialize 'Event Type', 'Title', and 'Close Size' with empty strings
                 events_df['Event Type'] = ""
                 events_df['Title'] = ""
                 events_df['Close Size'] = ""
-                
-                # Reorder columns for Events tab
                 events_df = events_df[['Fund', 'Event Date', 'Event Type', 'Title', 'Close Size']]
-                
-                # Add the initial Funds data to Events tab with 'Launch' and 'Title'
                 events_df['Event Type'] = "Launch"
                 events_df['Title'] = events_df['Fund'] + " launches"
-                
                 events_df.to_excel(writer, sheet_name='Events', index=False)
+                report.append("Events tab created")
+                report.append(f"{len(events_df.columns)} Columns")
+                report.extend(events_df.columns)
+                report.append("Launch data entered from row 2")
 
                 # Append additional data to Events tab
                 additional_data = {
@@ -183,56 +195,68 @@ def process_file(uploaded_file):
                     "Close Size": source_df["FINAL CLOSE SIZE (CURR. MN)"]
                 }
                 additional_df = pd.DataFrame(additional_data)
-
                 additional_df.to_excel(writer, sheet_name='Events', index=False, header=False, startrow=len(events_df)+1)
-
+                report.append(f"Final Close data => from row {len(events_df) + 2}")
                 startrow = len(events_df) + len(additional_df) + 1
 
                 # Append data for various closes
-                startrow = append_close_data(writer, source_df, "First Close", "First Close", " reaches first close", startrow)
-                startrow = append_close_data(writer, source_df, "Second Close", "Second Close", " reaches second close", startrow)
-                startrow = append_close_data(writer, source_df, "Third Close", "Third Close", " reaches third close", startrow)
-                startrow = append_close_data(writer, source_df, "Fourth Close", "Fourth Close", " reaches fourth close", startrow)
-                startrow = append_close_data(writer, source_df, "Fifth Close", "Fifth Close", " reaches fifth close", startrow)
-                startrow = append_close_data(writer, source_df, "Sixth Close", "Sixth Close", " reaches sixth close", startrow)
-                startrow = append_close_data(writer, source_df, "Seventh Close", "Seventh Close", " reaches seventh close", startrow)
+                startrow = append_close_data(writer, source_df, "First Close", "First Close", " reaches first close", startrow, report)
+                startrow = append_close_data(writer, source_df, "Second Close", "Second Close", " reaches second close", startrow, report)
+                startrow = append_close_data(writer, source_df, "Third Close", "Third Close", " reaches third close", startrow, report)
+                startrow = append_close_data(writer, source_df, "Fourth Close", "Fourth Close", " reaches fourth close", startrow, report)
+                startrow = append_close_data(writer, source_df, "Fifth Close", "Fifth Close", " reaches fifth close", startrow, report)
+                startrow = append_close_data(writer, source_df, "Sixth Close", "Sixth Close", " reaches sixth close", startrow, report)
+                startrow = append_close_data(writer, source_df, "Seventh Close", "Seventh Close", " reaches seventh close", startrow, report)
+                report.append("///////////////////////////////////////////////////////////////////////////")
 
-                # Create Performances tab with initial data
+                # Performances tab
                 performances_df = copy_columns(source_df, performances_mapping, additional_values_performances)
-                
-                # Ensure all necessary columns are present
                 for col in ['Fund', 'Performance Date', 'Fund Performance Measurement Type', 'Fund Performance Measurement Unit', 'Performance Value (Min)', 'Performance Value (Max)', 'Performance Source', 'Confidential']:
                     if col not in performances_df.columns:
                         performances_df[col] = ""
-
-                # Initialize non-source columns with appropriate names
                 performances_df['Performance Date'] = ""
                 performances_df['Fund Performance Measurement Type'] = "Target IRR Net"
                 performances_df['Fund Performance Measurement Unit'] = "Percentage"
                 performances_df['Performance Source'] = ""
                 performances_df['Confidential'] = ""
-                
-                # Reorder columns for Performances tab
                 performances_df = performances_df[['Fund', 'Performance Date', 'Fund Performance Measurement Type', 'Fund Performance Measurement Unit', 'Performance Value (Min)', 'Performance Value (Max)', 'Performance Source', 'Confidential']]
-                
                 performances_df.to_excel(writer, sheet_name='Performances', index=False)
+                report.append("Performances tab created")
+                report.append(f"{len(performances_df.columns)} Columns")
+                report.extend(performances_df.columns)
 
-                # Append additional performance data
                 startrow_performance = len(performances_df) + 1
-                startrow_performance = append_performance_data(writer, source_df, startrow_performance)
+                startrow_performance = append_performance_data(writer, source_df, startrow_performance, report)
+                report.append("///////////////////////////////////////////////////////////////////////////")
 
                 # Create new tabs with initial data
                 domicile_df = copy_columns(source_df, domicile_mapping)
                 domicile_df.to_excel(writer, sheet_name='Domicile', index=False)
+                report.append("Domicile tab created")
+                report.append(f"{len(domicile_df.columns)} Columns")
+                report.extend(domicile_df.columns)
+                report.append("///////////////////////////////////////////////////////////////////////////")
 
                 target_geographies_primary_region_df = copy_columns(source_df, target_geographies_primary_region_mapping)
                 target_geographies_primary_region_df.to_excel(writer, sheet_name='Target_Geographies_Primary_Regi', index=False)
+                report.append("Target_Geographies_Primary_Regi tab created")
+                report.append(f"{len(target_geographies_primary_region_df.columns)} Columns")
+                report.extend(target_geographies_primary_region_df.columns)
+                report.append("///////////////////////////////////////////////////////////////////////////")
 
                 target_geographies_df = copy_columns(source_df, target_geographies_mapping)
                 target_geographies_df.to_excel(writer, sheet_name='Target_Geographies', index=False)
+                report.append("Target_Geographies tab created")
+                report.append(f"{len(target_geographies_df.columns)} Columns")
+                report.extend(target_geographies_df.columns)
+                report.append("///////////////////////////////////////////////////////////////////////////")
 
                 target_sectors_primary_df = copy_columns(source_df, target_sectors_primary_mapping)
                 target_sectors_primary_df.to_excel(writer, sheet_name='Target_Sectors_Primary', index=False)
+                report.append("Target_Sectors_Primary tab created")
+                report.append(f"{len(target_sectors_primary_df.columns)} Columns")
+                report.extend(target_sectors_primary_df.columns)
+                report.append("///////////////////////////////////////////////////////////////////////////")
 
         # Auto-fit column widths
         autofit_columns(tmp.name)
@@ -242,7 +266,12 @@ def process_file(uploaded_file):
         dest_file_name = f"funds_curated_{now}.xlsx"
         dest_file_path = tmp.name
 
-    return dest_file_path, dest_file_name
+        # Create report file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as report_file:
+            report_file_path = report_file.name
+            report_file.write("\n\n".join(report).encode('utf-8'))
+
+    return dest_file_path, dest_file_name, report_file_path
 
 st.title("Curating FUNDS data files")
 st.write("Upload your source Excel file to create a destination file based on predefined instructions.")
@@ -250,11 +279,17 @@ st.write("Upload your source Excel file to create a destination file based on pr
 uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 
 if uploaded_file:
-    dest_file_path, dest_file_name = process_file(uploaded_file)
+    dest_file_path, dest_file_name, report_file_path = process_file(uploaded_file)
     st.success(f"Destination file '{dest_file_name}' created successfully!")
     st.download_button(
         label="Download Destination File",
         data=open(dest_file_path, "rb"),
         file_name=dest_file_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    st.download_button(
+        label="Download Report File",
+        data=open(report_file_path, "rb"),
+        file_name="curate_funds_report.txt",
+        mime="text/plain"
     )
