@@ -217,7 +217,7 @@ def process_file(uploaded_file):
                 target_sectors_primary_df.to_excel(writer, sheet_name='Target_Sectors_Primary', index=False)
 
         # Generate file name with current date and time
-        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        now = datetime.now().strftime("%Y%m%d_%H%M")
         tmp_path = tmp.name
         dest_file_name = f"funds_curated_{now}.xlsx"
         dest_file_path = tmp_path
