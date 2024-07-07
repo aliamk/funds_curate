@@ -244,7 +244,7 @@ def process_file(uploaded_file):
 
     return dest_file_path, dest_file_name
 
-st.title("Excel Column Copier")
+st.title("Curating FUNDS data files")
 st.write("Upload your source Excel file to create a destination file based on predefined instructions.")
 
 uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
