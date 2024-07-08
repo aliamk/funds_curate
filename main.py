@@ -184,7 +184,7 @@ def process_file(uploaded_file):
                 report.append("Events tab created")
                 report.append(f"{len(events_df.columns)} Columns\n")
                 report.extend(events_df.columns)
-                report.append("\nLaunch data entered from row 2\n")
+                report.append("\nLaunch data => from row 2\n")
 
                 # Append additional data to Events tab
                 additional_data = {
