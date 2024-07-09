@@ -2,3 +2,60 @@ streamlit
 pandas 
 openpyxl
 datetime
+
+"""
+1) 'Events' tab: This code is supposed to delete all rows in the 'Events' tab IF the 'Event Date' is blank.
+There are still rows that with blank 'Event Date' in the destination file.
+
+    # Remove rows with blank Event Date
+    events_df = events_df[events_df['Event Date'].notna()]
+
+2) 'Performances' tab: This code is supposed to delete all rows in the 'Performances' tab IF both 'Performance Value (Min)' and 'Performance Value (Max)' are blank.
+There are still rows that with blank 'Performance Value (Min)' and 'Performance Value (Max)' in the destination file.
+
+# Remove rows where both Performance Value (Min) and Performance Value (Max) are blank
+    performances_df = performances_df[~((performances_df['Performance Value (Min)'] == '') & (performances_df['Performance Value (Max)'] == ''))]
+
+3) 'Target_Geographies' tab: These substitutions for the 'Fund Target Geography' column didn't work. 
+Extra information; unlike column 'Target Geographies Primary Region' in the 'Target_Geographies_Primary_Regi' tab, the words that need replacing will be part of a list spearated by commas e.g., "Caribbean, East and Southeast Asia, Emerging Markets, South America, Sub-Saharan Africa".
+The code needs to find the words amongst many words and then replace them without altering the other words.
+
+geographies_replacements = {
+        'Africa': 'Sub-Saharan Africa',
+        'Americas': 'North America, Latin America & Caribbean',
+        'ASEAN': 'Asia',
+        'Asia and Rest of World': 'Multi-Region',
+        'Central and East Europe': 'Central & Eastern Europe',
+        'East and Southeast Asia': 'East & Southeast Asia',
+        'Emerging Markets': 'Multi-Region',
+        'EU': 'Europe',
+        'Greater China': 'China',
+        'Hong Kong SAR - China': 'Hong Kong',
+        'Macao SAR - China': 'Macao',
+        'Middle East': 'Middle East & North Africa',
+        'Nordic': 'Nordics',
+        'OECD': 'Multi-Region',
+        'South America': 'Latin America & Caribbean',
+        'UK': 'United Kingdom',
+        'US': 'United States',
+        'West Europe': 'Western Europe',
+        'MENA': 'Middle East & North Africa',
+        'GCC': 'Bahrain, Kuwait, Oman, Qatar, Saudi Arabia, United Arab Emirates',
+        'Frontier Markets': 'Multi-Region'
+    }
+
+4) 'Roles' tab: When column 'Company' has 'Used but Not Specified', then write 'TRUE' in column 'Confidential'.
+If column 'Company has 'Used but Not Specified', delete the contents of the cell, but don't delete the whole row.
+This didn't work:
+
+  'roles_df['Confidential'] = roles_df['Company'].apply(lambda x: "TRUE" if x == "Used but Not Specified" else "")'
+'roles_df['Company'] = roles_df['Company'].replace("Used but Not Specified", "")'
+
+
+5) Search every tab and column for cell contents that match "0" or "nan" or "n/a" and delete the cell contents. The code must match entire cell contents before deleting.
+It shouldn't delete 0s when they are part of a larger number e.g., "2000" or "10" or "0.5".
+Update the report doc with what was deleted in the cell, the tab name, column name, row number 
+e.g., '"0" deleted, "Roles" tab, column "Company", row 15'.
+Even if none of these values are found in the spreadsheet, the report should be updated.
+
+"""
