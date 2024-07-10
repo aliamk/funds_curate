@@ -668,8 +668,14 @@ def create_roles_tab(writer, source_df, report):
     
     roles_df = pd.concat(roles_data, ignore_index=True)
     
-    # Normalize the 'Company' column to handle case insensitivity
-    roles_df['Company'] = roles_df['Company'].str.lower()
+    # Normalize the 'Company' column to handle case insensitivity only for specific words
+    def normalize_company(value):
+        words = str(value).split()
+        if words and (words[0].lower() in ['used', 'not']):
+            return value.lower()
+        return value
+    
+    roles_df['Company'] = roles_df['Company'].apply(normalize_company)
 
     # Handle Company replacements and additional columns
     roles_df['Confidential'] = roles_df['Company'].apply(lambda x: "TRUE" if x == "used but not specified" else "")
