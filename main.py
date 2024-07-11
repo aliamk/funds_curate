@@ -714,11 +714,6 @@ def create_roles_tab(writer, source_df, report):
     report.append(f"'Roles' tab, column 'Company' rows deleted containing 'Used but Not Specified': {used_not_specified_count}")
     report.append("///////////////////////////////////////////////////////////////////////////\n")
 
-
-
-
-
-
 def create_fees_tab(writer):
     fees_df = pd.DataFrame(columns=["Fund", "Attribute", "Value"])
     fees_df.to_excel(writer, sheet_name='Fees', index=False)
@@ -785,7 +780,7 @@ def process_file(uploaded_file):
 
 
 # Streamlit UI
-st.title("Curating FUNDS data files")
+st.title("Curating FINFRA 1 data files")
 st.write("Upload your source Excel file to create a destination file based on predefined instructions.")
 
 uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
