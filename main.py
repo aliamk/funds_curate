@@ -786,17 +786,26 @@ st.write("Upload your source Excel file to create a destination file based on pr
 uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 
 if uploaded_file:
-    dest_file_path, dest_file_name, report_file_path = process_file(uploaded_file)
-    st.success(f"Destination file '{dest_file_name}' created successfully!")
+    if 'processed' not in st.session_state:
+        with st.spinner('Processing file...'):
+            dest_file_path, dest_file_name, report_file_path = process_file(uploaded_file)
+            st.session_state.processed = True
+            st.session_state.dest_file_path = dest_file_path
+            st.session_state.dest_file_name = dest_file_name
+            st.session_state.report_file_path = report_file_path
+
+    st.success(f"Destination file '{st.session_state.dest_file_name}' created successfully!")
+    
     st.download_button(
         label="Download Destination File",
-        data=open(dest_file_path, "rb"),
-        file_name=dest_file_name,
+        data=open(st.session_state.dest_file_path, "rb"),
+        file_name=st.session_state.dest_file_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+    
     st.download_button(
         label="Download Report File",
-        data=open(report_file_path, "rb"),
+        data=open(st.session_state.report_file_path, "rb"),
         file_name="curated_finfra1_report.txt",
         mime="text/plain"
     )
