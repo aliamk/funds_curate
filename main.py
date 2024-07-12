@@ -768,7 +768,7 @@ def process_file(uploaded_file):
 
         # Generate file name with current date and time
         now = datetime.now().strftime("%Y%m%d_%H%M")
-        dest_file_name = f"funds_curated_{now}.xlsx"
+        dest_file_name = f"curated_finfra1_{now}.xlsx"
         dest_file_path = tmp.name
 
         # Create report file
@@ -797,6 +797,6 @@ if uploaded_file:
     st.download_button(
         label="Download Report File",
         data=open(report_file_path, "rb"),
-        file_name="curate_funds_report.txt",
+        file_name="curated_finfra1_report.txt",
         mime="text/plain"
     )
