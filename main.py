@@ -276,53 +276,56 @@ def create_funds_tab(writer, source_df, report):
     report.append("\n///////////////////////////////////////////////////////////////////////////\n")
 
 def create_events_tab(writer, source_df, report):
-    events_mapping = {
-        "NAME": "Fund",
-        "FUND RAISING LAUNCH DATE": "Event Date",
-        "": "Event Type",
-        "": "Title",
-        "FINAL CLOSE SIZE (CURR. MN)": "Close Size"
-    }
-    events_df = copy_columns(source_df, events_mapping)
-    events_df['Event Type'] = ""
-    events_df['Title'] = ""
-    events_df['Close Size'] = ""
-    events_df = events_df[['Fund', 'Event Date', 'Event Type', 'Title', 'Close Size']]
-    events_df['Event Type'] = "Launch"
-    events_df['Title'] = events_df['Fund'] + " launches"
-    
-    # Remove rows with blank Event Date
-    events_df = events_df[events_df['Event Date'].notna() & (events_df['Event Date'] != '')]
-    
-    events_df.to_excel(writer, sheet_name='Events', index=False)
-    report.append("Events tab created")
-    report.append(f"{len(events_df.columns)} Columns\n")
-    report.extend(events_df.columns)
-    report.append("\nLaunch data entered from row 2\n")
+    # Check if 'FINAL CLOSE DATE' and other necessary columns exist in the DataFrame
+    if 'FINAL CLOSE DATE' in source_df.columns and 'FINAL CLOSE SIZE (CURR. MN)' in source_df.columns:
+        final_close_date = source_df["FINAL CLOSE DATE"]
 
-    # Append additional data to Events tab
-    additional_data = {
-        "Fund": source_df["NAME"],
-        "Event Date": source_df["FINAL CLOSE DATE"],
-        "Event Type": "Final Close",
-        "Title": source_df["NAME"] + " reaches final close",
-        "Close Size": source_df["FINAL CLOSE SIZE (CURR. MN)"]
-    }
-    additional_df = pd.DataFrame(additional_data)
-    additional_df = additional_df[additional_df['Event Date'].notna()]
-    additional_df.to_excel(writer, sheet_name='Events', index=False, header=False, startrow=len(events_df)+1)
-    report.append(f"Final Close data => from row {len(events_df) + 2}\n")
-    startrow = len(events_df) + len(additional_df) + 1
+        events_mapping = {
+            "NAME": "Fund",
+            "FUND RAISING LAUNCH DATE": "Event Date",
+            "": "Event Type",
+            "": "Title",
+            "FINAL CLOSE SIZE (CURR. MN)": "Close Size"
+        }
+        
+        events_df = copy_columns(source_df, events_mapping)
+        events_df['Event Type'] = "Launch"
+        events_df['Title'] = events_df['Fund'] + " launches"
 
-    # Append data for various closes
-    startrow = append_close_data(writer, source_df, "First Close", "First Close", " reaches first close", startrow, report)
-    startrow = append_close_data(writer, source_df, "Second Close", "Second Close", " reaches second close", startrow, report)
-    startrow = append_close_data(writer, source_df, "Third Close", "Third Close", " reaches third close", startrow, report)
-    startrow = append_close_data(writer, source_df, "Fourth Close", "Fourth Close", " reaches fourth close", startrow, report)
-    startrow = append_close_data(writer, source_df, "Fifth Close", "Fifth Close", " reaches fifth close", startrow, report)
-    startrow = append_close_data(writer, source_df, "Sixth Close", "Sixth Close", " reaches sixth close", startrow, report)
-    startrow = append_close_data(writer, source_df, "Seventh Close", "Seventh Close", " reaches seventh close", startrow, report)
-    report.append("///////////////////////////////////////////////////////////////////////////\n")
+        # Remove rows with blank Event Date
+        events_df = events_df[events_df['Event Date'].notna() & (events_df['Event Date'] != '')]
+
+        events_df.to_excel(writer, sheet_name='Events', index=False)
+        report.append("Events tab created")
+        report.append(f"{len(events_df.columns)} Columns\n")
+        report.extend(events_df.columns)
+        report.append("\nLaunch data entered from row 2\n")
+
+        # Append additional data to Events tab
+        additional_data = {
+            "Fund": source_df["NAME"],
+            "Event Date": final_close_date,
+            "Event Type": "Final Close",
+            "Title": source_df["NAME"] + " reaches final close",
+            "Close Size": source_df["FINAL CLOSE SIZE (CURR. MN)"]
+        }
+        additional_df = pd.DataFrame(additional_data)
+        additional_df = additional_df[additional_df['Event Date'].notna()]
+        additional_df.to_excel(writer, sheet_name='Events', index=False, header=False, startrow=len(events_df)+1)
+        report.append(f"Final Close data => from row {len(events_df) + 2}\n")
+        startrow = len(events_df) + len(additional_df) + 1
+
+        # Append data for various closes
+        startrow = append_close_data(writer, source_df, "First Close", "First Close", " reaches first close", startrow, report)
+        startrow = append_close_data(writer, source_df, "Second Close", "Second Close", " reaches second close", startrow, report)
+        startrow = append_close_data(writer, source_df, "Third Close", "Third Close", " reaches third close", startrow, report)
+        startrow = append_close_data(writer, source_df, "Fourth Close", "Fourth Close", " reaches fourth close", startrow, report)
+        startrow = append_close_data(writer, source_df, "Fifth Close", "Fifth Close", " reaches fifth close", startrow, report)
+        startrow = append_close_data(writer, source_df, "Sixth Close", "Sixth Close", " reaches sixth close", startrow, report)
+        startrow = append_close_data(writer, source_df, "Seventh Close", "Seventh Close", " reaches seventh close", startrow, report)
+        report.append("///////////////////////////////////////////////////////////////////////////\n")
+    else:
+        report.append("Required columns for 'FINAL CLOSE DATE' or 'FINAL CLOSE SIZE (CURR. MN)' not found. Skipping final close data.\n")
 
 def create_performances_tab(writer, source_df, report):
     performances_mapping = {
@@ -693,7 +696,14 @@ def create_roles_tab(writer, source_df, report):
     roles_df = roles_df[roles_df['Company'].notna()]
     blank_or_comma_deleted = initial_count - len(roles_df)
     initial_count = len(roles_df)
-    roles_df = roles_df[~roles_df['Company'].str.contains(',')]
+    # Ensure 'Company' column is completely filled and converted to string type
+    roles_df['Company'] = roles_df['Company'].fillna('').astype(str)
+
+    # Now apply the filter to remove rows where 'Company' contains a comma
+    contains_comma = roles_df['Company'].str.contains(',')
+
+    # Use the ~ operator on the boolean Series to filter out rows with commas
+    roles_df = roles_df[~contains_comma]
     comma_deleted = initial_count - len(roles_df)
     
     # Tally for 'Not Used' replacements

@@ -1,3 +1,3 @@
 # finfra_1_curate
 
-# Add spinner
+# https://aliamk-curate-funds-data-files.streamlit.app/
