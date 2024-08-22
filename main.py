@@ -650,79 +650,77 @@ def create_target_sectors_secondary_tab(writer, report):
     report.extend(["Fund", "Fund Subsectors"])
     report.append("///////////////////////////////////////////////////////////////////////////\n")
 
+def normalize_column_names(df):
+    """
+    Normalize column names by stripping whitespace and converting to uppercase.
+    """
+    df.columns = df.columns.str.strip().str.upper()
+
 def create_roles_tab(writer, source_df, report):
-    roles_data = []
+    # Normalize the column names in the source_df
+    normalize_column_names(source_df)
     
-    roles = [
+    # Define the roles and corresponding source columns
+    roles_mapping = [
         ("FUND MANAGER", "General Partner"),
         ("PLACEMENT AGENTS", "Placement Agent"),
-        ("LAW FIRMS", "Legal Advisor"),
+        ("LAW FIRMS", "Legal Adviser"),
         ("AUDITORS", "Auditor"),
         ("ADMINISTRATORS", "Administrator")
     ]
     
-    for role_column, role_name in roles:
-        role_df = pd.DataFrame({
-            "Fund": source_df["NAME"],
-            "Company": source_df.get(role_column, ""),
-            "Role": role_name
-        })
+    # Initialize an empty list to store dataframes
+    roles_data = []
+    
+    # Loop over the mapping and create dataframes
+    for role_column, role_name in roles_mapping:
+        # Check if the column exists in the source_df
+        if role_column in source_df.columns:
+            role_df = pd.DataFrame({
+                "Fund": source_df["NAME"],
+                "Company": source_df[role_column],
+                "Role": role_name
+            })
+        else:
+            # If the column doesn't exist, create an empty 'Company' column
+            role_df = pd.DataFrame({
+                "Fund": source_df["NAME"],
+                "Company": "",  # Fill with empty string if the column is missing
+                "Role": role_name
+            })
         roles_data.append(role_df)
     
+    # Concatenate all dataframes vertically
     roles_df = pd.concat(roles_data, ignore_index=True)
     
-    # Normalize the 'Company' column to handle case insensitivity only for specific words
-    def normalize_company(value):
-        words = str(value).split()
-        if words and (words[0].lower() in ['used', 'not']):
-            return value.lower()
-        return value
+    # Step 6 and 7: Handle 'Confidential' column based on 'Company' column values
+    roles_df['Confidential'] = roles_df['Company'].apply(
+        lambda x: "TRUE" if str(x).strip().lower() in ["not used", "used but not specified"] else ""
+    )
     
-    roles_df['Company'] = roles_df['Company'].apply(normalize_company)
-
-    # Handle Company replacements and additional columns
-    roles_df['Confidential'] = roles_df['Company'].apply(lambda x: "TRUE" if x == "used but not specified" else "")
-    used_not_specified_count = roles_df['Company'].value_counts().get('used but not specified', 0)
-    roles_df['Company'] = roles_df['Company'].replace("used but not specified", "")
+    # Step 8: Remove rows where 'Company' is blank, NaN, empty, or contains only whitespace or commas
+    roles_df = roles_df[roles_df['Company'].apply(lambda x: bool(str(x).strip()) and ',' not in str(x).strip())]
     
-    # Add 'Not Used' column and set values
-    roles_df['Not Used'] = roles_df['Company'].apply(lambda x: "TRUE" if x == "not used" else "")
+    # Step 9 and 10: Replace specific terms with a blank cell in the 'Company' column
+    roles_df['Company'] = roles_df['Company'].replace(
+        {"Not Used": "", "Used but Not Specified": ""}
+    )
+    
+    # Add 'Not Used' column (optional, depending on your needs)
+    roles_df['Not Used'] = roles_df['Company'].apply(lambda x: "TRUE" if x == "" else "")
     
     # Reorder columns to match the specified order
     roles_df = roles_df[['Fund', 'Company', 'Role', 'Not Used', 'Confidential']]
     
-    # Delete rows where 'Company' is blank or contains a comma
-    initial_count = len(roles_df)
-    roles_df = roles_df[roles_df['Company'].notna()]
-    blank_or_comma_deleted = initial_count - len(roles_df)
-    initial_count = len(roles_df)
-    # Ensure 'Company' column is completely filled and converted to string type
-    roles_df['Company'] = roles_df['Company'].fillna('').astype(str)
-
-    # Now apply the filter to remove rows where 'Company' contains a comma
-    contains_comma = roles_df['Company'].str.contains(',')
-
-    # Use the ~ operator on the boolean Series to filter out rows with commas
-    roles_df = roles_df[~contains_comma]
-    comma_deleted = initial_count - len(roles_df)
-    
-    # Tally for 'Not Used' replacements
-    not_used_count = roles_df['Company'].value_counts().get('not used', 0)
-    
-    # Delete the content for specific values
-    roles_df['Company'] = roles_df['Company'].replace("not used", "")
-    
+    # Write the dataframe to the 'Roles' sheet
     roles_df.to_excel(writer, sheet_name='Roles', index=False)
+    
+    # Update the report
     report.append("Roles tab created")
     report.append(f"{len(roles_df.columns)} Columns\n")
     report.extend(['Fund', 'Company', 'Role', 'Not Used', 'Confidential'])
     report.append("///////////////////////////////////////////////////////////////////////////\n")
-    
-    # Update the report with the tallies
-    report.append(f"'Roles' tab, column 'Company' rows deleted containing blank/contains commas: {blank_or_comma_deleted}")
-    report.append(f"'Roles' tab, column 'Company' rows deleted containing 'Not Used': {not_used_count}")
-    report.append(f"'Roles' tab, column 'Company' rows deleted containing 'Used but Not Specified': {used_not_specified_count}")
-    report.append("///////////////////////////////////////////////////////////////////////////\n")
+
 
 def create_fees_tab(writer):
     fees_df = pd.DataFrame(columns=["Fund", "Attribute", "Value"])
