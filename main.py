@@ -129,13 +129,18 @@ def create_funds_tab(writer, source_df, report):
         "INITIAL TARGET (CURR. MN)": "Initial Target Size (Local Currency m)",
         "HARD CAP (CURR. MN)": "Hard Cap (Local Currency m)",
         "OFFER CO-INVESTMENT OPPORTUNITIES TO LPS?": "Fund coinvesting Lps",
-        "FUND LEGAL STRUCTURE": "Fund Legal Structure",
-        "TIMES TO FIRST CLOSE": "Times to First Close",
-        "TOTAL MONTHS IN MARKET": "Total Months in Market",
         "OVERIDE FUND STATUS": "Overide Fund Status"
     }
     
+    # Copy relevant columns to a new DataFrame
     funds_df = copy_columns(source_df, funds_mapping)
+    
+    # Explicitly remove rows where any column matches the source column names
+    source_headers = set(source_df.columns)
+    funds_df = funds_df[~funds_df.isin(source_headers).any(axis=1)]
+    
+    # Write the cleaned DataFrame to the 'Funds' sheet
+    funds_df.to_excel(writer, sheet_name='Funds', index=False)
     
     # Apply Fund Status and Fund Style rules
     fund_status_replacements = {
@@ -255,11 +260,11 @@ def create_funds_tab(writer, source_df, report):
 
     # Reorder columns to match the desired order
     column_order = [
-        "Fund", "Fund Currency", "Vintage Year", "Fund Status", "Open/Closed", "Fund Style", "Asset Class",
-        "Separate Account", "Fund Legal Structure", "Fund Sequence (Total)", "Fund Series", "Fund Life", 
-        "Fund Life Extension", "Target Size (Local Currency m)", "Initial Target Size (Local Currency m)",
-        "Hard Cap (Local Currency m)", "Fund coinvesting Lps", "Times to First Close", "Total Months in Market",
-        "Overide Fund Status"
+        "Fund", "Fund Currency", "Vintage Year", "Fund Status", "Fund Style", "Asset Class",
+        "Separate Account", "Fund Sequence (Total)", "Fund Series", "Fund Life", 
+        "Fund Life Extension", "Target Size (Local Currency m)", 
+        "Initial Target Size (Local Currency m)", "Hard Cap (Local Currency m)", 
+        "Fund coinvesting Lps", "Overide Fund Status"
     ]
     funds_df = funds_df[column_order]
 
@@ -275,6 +280,8 @@ def create_funds_tab(writer, source_df, report):
     report.append(f"'Liquidated': 'True' => {override_count} replacements (rows {', '.join(map(str, override_rows[:5])) + (' ...' if len(override_rows) > 5 else '')})")
     report.append("\n///////////////////////////////////////////////////////////////////////////\n")
 
+
+
 def create_events_tab(writer, source_df, report):
     # Check if 'FINAL CLOSE DATE' and other necessary columns exist in the DataFrame
     if 'FINAL CLOSE DATE' in source_df.columns and 'FINAL CLOSE SIZE (CURR. MN)' in source_df.columns:
@@ -287,7 +294,8 @@ def create_events_tab(writer, source_df, report):
             "": "Title",
             "FINAL CLOSE SIZE (CURR. MN)": "Close Size"
         }
-        
+
+        # Create the initial events DataFrame based on the mapping
         events_df = copy_columns(source_df, events_mapping)
         events_df['Event Type'] = "Launch"
         events_df['Title'] = events_df['Fund'] + " launches"
@@ -295,6 +303,11 @@ def create_events_tab(writer, source_df, report):
         # Remove rows with blank Event Date
         events_df = events_df[events_df['Event Date'].notna() & (events_df['Event Date'] != '')]
 
+        # Reorder columns to match the specified order
+        column_order = ["Fund", "Event Date", "Event Type", "Title", "Close Size"]
+        events_df = events_df[column_order]
+
+        # Write the initial events DataFrame to the 'Events' sheet
         events_df.to_excel(writer, sheet_name='Events', index=False)
         report.append("Events tab created")
         report.append(f"{len(events_df.columns)} Columns\n")
@@ -311,11 +324,16 @@ def create_events_tab(writer, source_df, report):
         }
         additional_df = pd.DataFrame(additional_data)
         additional_df = additional_df[additional_df['Event Date'].notna()]
-        additional_df.to_excel(writer, sheet_name='Events', index=False, header=False, startrow=len(events_df)+1)
+
+        # Reorder columns for additional data
+        additional_df = additional_df[column_order]
+
+        # Append the additional data to the Events tab
+        additional_df.to_excel(writer, sheet_name='Events', index=False, header=False, startrow=len(events_df) + 1)
         report.append(f"Final Close data => from row {len(events_df) + 2}\n")
         startrow = len(events_df) + len(additional_df) + 1
 
-        # Append data for various closes
+        # Append data for various closes, ensuring column order
         startrow = append_close_data(writer, source_df, "First Close", "First Close", " reaches first close", startrow, report)
         startrow = append_close_data(writer, source_df, "Second Close", "Second Close", " reaches second close", startrow, report)
         startrow = append_close_data(writer, source_df, "Third Close", "Third Close", " reaches third close", startrow, report)
@@ -326,6 +344,34 @@ def create_events_tab(writer, source_df, report):
         report.append("///////////////////////////////////////////////////////////////////////////\n")
     else:
         report.append("Required columns for 'FINAL CLOSE DATE' or 'FINAL CLOSE SIZE (CURR. MN)' not found. Skipping final close data.\n")
+
+def append_close_data(writer, source_df, status, event_type, title_suffix, startrow, report):
+    close_filter = source_df["STATUS"] == status
+    close_funds = source_df[close_filter]
+    if close_funds.empty:
+        report.append(f"{status} data => data was not found in the source file\n")
+        return startrow
+
+    close_df = pd.DataFrame({
+        "Fund": close_funds["NAME"],
+        "Event Date": close_funds["LATEST INTERIM CLOSE DATE"],
+        "Event Type": event_type,
+        "Title": close_funds["NAME"] + title_suffix,
+        "Close Size": close_funds["LATEST INTERIM CLOSE SIZE (CURR. MN)"]
+    })
+
+    if not close_df.empty:
+        # Ensure the columns are in the correct order before appending
+        column_order = ["Fund", "Event Date", "Event Type", "Title", "Close Size"]
+        close_df = close_df[column_order]
+
+        close_df.to_excel(writer, sheet_name='Events', index=False, header=False, startrow=startrow)
+        report.append(f"{status} data => from row {startrow + 2}\n")
+        startrow += len(close_df)
+
+    return startrow
+
+
 
 def create_performances_tab(writer, source_df, report):
     performances_mapping = {
