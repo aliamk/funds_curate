@@ -15,6 +15,22 @@ def copy_columns(source_df, mapping, additional_values=None):
             dest_df[dest_col] = additional_values.get(dest_col, "") if additional_values else ""
     return dest_df
 
+def clean_worksheets(writer_path):
+    # Load the workbook to manipulate it
+    workbook = load_workbook(writer_path)
+
+    for sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+        
+        # Check if row 139 contains 'FUND MANAGER TOTAL AUM (EUR MN)'
+        if sheet.cell(row=139, column=1).value == 'FUND MANAGER TOTAL AUM (EUR MN)':
+            # Delete rows 2 to 139
+            sheet.delete_rows(2, 138)
+            # Everything from row 140 onwards is automatically shifted up
+                        
+    # Save the workbook after modifications
+    workbook.save(writer_path)
+
 def append_close_data(writer, source_df, status, event_type, title_suffix, startrow, report):
     close_filter = source_df["STATUS"] == status
     close_funds = source_df[close_filter]
@@ -129,6 +145,9 @@ def create_funds_tab(writer, source_df, report):
         "INITIAL TARGET (CURR. MN)": "Initial Target Size (Local Currency m)",
         "HARD CAP (CURR. MN)": "Hard Cap (Local Currency m)",
         "OFFER CO-INVESTMENT OPPORTUNITIES TO LPS?": "Fund coinvesting Lps",
+        "FUND LEGAL STRUCTURE": "Fund Legal Structure",
+        "TIMES TO FIRST CLOSE": "Times to First Close",
+        "TOTAL MONTHS IN MARKET": "Total Months in Market",
         "OVERIDE FUND STATUS": "Overide Fund Status"
     }
     
@@ -264,8 +283,9 @@ def create_funds_tab(writer, source_df, report):
         "Separate Account", "Fund Sequence (Total)", "Fund Series", "Fund Life", 
         "Fund Life Extension", "Target Size (Local Currency m)", 
         "Initial Target Size (Local Currency m)", "Hard Cap (Local Currency m)", 
-        "Fund coinvesting Lps", "Overide Fund Status"
+        "Fund coinvesting Lps", "Fund Legal Structure", "Times to First Close", "Total Months in Market", "Overide Fund Status"
     ]
+    
     funds_df = funds_df[column_order]
 
     funds_df.to_excel(writer, sheet_name='Funds', index=False)
@@ -819,6 +839,9 @@ def process_file(uploaded_file):
 
         # Auto-fit column widths
         autofit_columns(tmp.name)
+
+        # Clean worksheets according to the new logic
+        clean_worksheets(tmp.name)
 
         # Generate file name with current date and time
         now = datetime.now().strftime("%Y%m%d_%H%M")
